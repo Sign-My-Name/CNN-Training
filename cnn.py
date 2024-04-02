@@ -3,7 +3,6 @@ import torch.nn as nn
 import numpy as np
 import pandas as pd
 
-# DEVICE = torch.devide('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 class CNN(nn.Module):
@@ -31,9 +30,7 @@ class CNN(nn.Module):
         out = self.conv4(out)
         out = self.maxpool2(out)
 
-        print(out.shape)
         out = out.reshape(out.size(0), -1)
-        print(out.shape)
 
         out = self.fc1(out)
         out = self.relu1(out)

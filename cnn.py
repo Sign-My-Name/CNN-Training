@@ -9,33 +9,90 @@ class CNN(nn.Module):
     def __init__(self, num_classes):
         print('hello world')
         super(CNN, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3, padding=1)
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        self.conv3 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=9, padding=3)
-        self.conv4 = nn.Conv2d(in_channels=64, out_channels=64, kernel_size=9, padding=3)
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.feature_extractor = nn.Sequential(
+            nn.Conv2d(in_channels=1, out_channels=64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.BatchNorm2d(128),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels=128, out_channels=512, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.BatchNorm2d(512),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels=512, out_channels=64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.BatchNorm2d(64),
+            nn.MaxPool2d(2),
+            nn.Conv2d(in_channels=64, out_channels=32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Dropout(),
+            nn.BatchNorm2d(32),
+            nn.MaxPool2d(2),
+        )
 
-        self.fc1 = nn.Linear(246016, 256)
-        self.relu1 = nn.ReLU()
-        self.fc2 = nn.Linear(256, num_classes)
+        self.classifier = nn.Sequential(
+            nn.Linear(32, 512),
+            nn.Dropout(),
+            nn.Linear(512,num_classes),
+            nn.Softmax(dim=1)
+        )
 
     def forward(self, x):
-        out = self.conv1(x)
-        out = self.conv2(out)
-        out = self.maxpool1(out)
-        out = self.conv3(out)
-        out = self.conv4(out)
-        out = self.maxpool2(out)
+        features = self.feature_extractor(x)
+        features = features.reshape(features.size(0), -1)
 
-        out = out.reshape(out.size(0), -1)
+        class_scores = self.classifier(features)
 
-        out = self.fc1(out)
-        out = self.relu1(out)
-        out = self.fc2(out)
+        return class_scores
+    
+    def train_model(self, X, y, epochs=50, lr=0.00001, batch_size=64):
+        criterion = nn.CrossEntropyLoss()
+        optimizer = torch.optim.Adam(self.parameters(), lr=lr)
+        self.to(self.device)
 
-        return out
+        num_batches = int(np.ceil(len(X) / batch_size))
+
+        for epoch in range(epochs):
+            permutation = torch.randperm(len(X))
+            X = X[permutation]
+            y = y[permutation]
+            for batch_idx in range(num_batches):
+            # Select data for this batch
+                start_idx = batch_idx * batch_size
+                end_idx = min(start_idx + batch_size, len(X))
+
+                X_batch = X[start_idx:end_idx].to(self.device)
+                y_batch = y[start_idx:end_idx].to(self.device)
+
+                y_hat = self(X_batch)
+                loss = criterion(y_hat, y_batch)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+
+            print(f"Epoch: {epoch+1}/{epochs} | Loss: {loss.item()}")
+    
+    def predict(self, X):
+        X = X.to(self.device)
+        self.eval()
+        y_hat = []
+
+        with torch.no_grad():
+            y_hat = self(X)
+            # _, predicted = torch.softmax(outputs, 1)
+            # y_hat.extend(predicted.cpu().numpy())
+    
+        return y_hat.to('cpu')
+
 
 

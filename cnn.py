@@ -2,11 +2,12 @@ import torch
 import torch.nn as nn
 import numpy as np
 import pandas as pd
+from torch.utils.data import TensorDataset, DataLoader
 
 
 
 class CNN(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self, num_classes, pic_size=128):
         print('hello world')
         super(CNN, self).__init__()
 
@@ -39,8 +40,12 @@ class CNN(nn.Module):
             nn.MaxPool2d(2),
         )
 
+        x = torch.randn(1, 1, pic_size, pic_size)  # Adjust the size here to match your input size
+        x = self.feature_extractor(x)
+        feature_size = x.numel()
+
         self.classifier = nn.Sequential(
-            nn.Linear(32, 512),
+            nn.Linear(feature_size, 512),
             nn.Dropout(),
             nn.Linear(512,num_classes),
             nn.Softmax(dim=1)
@@ -54,24 +59,20 @@ class CNN(nn.Module):
 
         return class_scores
     
-    def train_model(self, X, y, epochs=50, lr=0.00001, batch_size=64):
+    def train_model(self, X, y, epochs=50, lr=0.00001, batch_size=128):
         criterion = nn.CrossEntropyLoss()
         optimizer = torch.optim.Adam(self.parameters(), lr=lr)
         self.to(self.device)
 
-        num_batches = int(np.ceil(len(X) / batch_size))
+        X = torch.tensor(X)
+        y = torch.tensor(y)
+        dataset = TensorDataset(X, y)
+        dataloader = DataLoader(dataset=dataset, batch_size=batch_size)
 
         for epoch in range(epochs):
-            permutation = torch.randperm(len(X))
-            X = X[permutation]
-            y = y[permutation]
-            for batch_idx in range(num_batches):
+            for batch in dataloader:
             # Select data for this batch
-                start_idx = batch_idx * batch_size
-                end_idx = min(start_idx + batch_size, len(X))
-
-                X_batch = X[start_idx:end_idx].to(self.device)
-                y_batch = y[start_idx:end_idx].to(self.device)
+                X_batch, y_batch = batch
 
                 y_hat = self(X_batch)
                 loss = criterion(y_hat, y_batch)
@@ -82,16 +83,21 @@ class CNN(nn.Module):
 
             print(f"Epoch: {epoch+1}/{epochs} | Loss: {loss.item()}")
     
-    def predict(self, X):
-        X = X.to(self.device)
+    def predict(self, X, batch_size=128):
         self.eval()
         y_hat = []
 
+        X = torch.tensor(X)
+        dataloader = DataLoader(dataset=X, batch_size=batch_size)
+
         with torch.no_grad():
-            y_hat = self(X)
-            # _, predicted = torch.softmax(outputs, 1)
-            # y_hat.extend(predicted.cpu().numpy())
-    
+            for X_batch in dataloader:
+            # Select data for this batch
+                batch_predictions = self(X_batch)
+                y_hat.append(batch_predictions)
+
+        y_hat = torch.cat(y_hat, dim=0)
+        
         return y_hat.to('cpu')
 
 

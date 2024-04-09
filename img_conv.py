@@ -20,8 +20,8 @@ def transform(image):
 
 
 
-original_dir = 'CNN-Training/data/train_images'
-transformed_dir = 'CNN-Training/data/transformed'
+original_dir = './data/train_images'
+transformed_dir = './data/transformed50'
 
 if not os.path.exists(transformed_dir):
     os.makedirs(transformed_dir)
@@ -48,6 +48,6 @@ for letter in folders:
         transformed_image = transform(image)
         cv2.imwrite(save_path, transformed_image)
 
-    print("Image processing complete. Transformed images are saved in:", transformed_dir+letter_dir)
+    print("Image processing complete. Transformed images are saved in:",  os.path.join(transformed_dir, letter_dir))
 
     
